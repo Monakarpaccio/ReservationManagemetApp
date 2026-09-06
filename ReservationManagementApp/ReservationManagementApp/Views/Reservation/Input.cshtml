@@ -1,0 +1,49 @@
+﻿@using ReservationManagementApp.Models.Entities
+@model ReservationManagementApp.Models.ViewModels.ReservationInputViewModel
+@{
+    ViewData["Title"] = "予約内容入力";
+    var participants = Model.Participants ?? new List<Participant>();
+    var participantRowCount = Math.Max(3, participants.Count);
+    var dateText = Model.Date.ToString("yyyy-MM-dd");
+    var startTimeText = Model.StartTime.ToString("hh\\:mm");
+    var endTimeText = Model.EndTime.ToString("hh\\:mm");
+}
+
+<h2>予約内容入力</h2>
+@Html.ValidationSummary(false)
+<p>@Model.FacilityName / @Model.RoomName</p>
+<p>@Model.Date.ToString("yyyy/MM/dd") @startTimeText ～ @endTimeText</p>
+
+@using (Html.BeginForm("Confirm", "Reservation", FormMethod.Post, new { @class = "participant-form" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.RoomId)
+    @Html.HiddenFor(m => m.RoomName)
+    @Html.HiddenFor(m => m.FacilityName)
+    @Html.Hidden("Date", dateText)
+    @Html.Hidden("StartTime", startTimeText)
+    @Html.Hidden("EndTime", endTimeText)
+
+    <p><label>タイトル @Html.TextBoxFor(m => m.Title, new { required = "required" })</label></p>
+    <fieldset>
+        <legend>参加者</legend>
+        <p class="muted">氏名が空欄の行は登録されません。</p>
+        @for (var i = 0; i < participantRowCount; i++)
+        {
+            var participant = i < participants.Count ? participants[i] : new Participant();
+            var nameField = "Participants[" + i + "].Name";
+            var companyField = "Participants[" + i + "].CompanyName";
+            var privateField = "Participants[" + i + "].IsPrivate";
+            <div class="participant-row">
+                @Html.Hidden("Participants.Index", i)
+                <label>氏名 @Html.TextBox(nameField, participant.Name, new { @class = "participant-name" })</label>
+                <label>会社名 @Html.TextBox(companyField, participant.CompanyName)</label>
+                <label>@Html.CheckBox(privateField, participant.IsPrivate) 非公開</label>
+            </div>
+        }
+    </fieldset>
+    <p><label>備考<br />@Html.TextAreaFor(m => m.Remarks, 4, 60, null)</label></p>
+    <button type="submit">確認へ</button>
+}
+
+<p>@Html.ActionLink("ホームへ戻る", "Index", "ReservationList")</p>

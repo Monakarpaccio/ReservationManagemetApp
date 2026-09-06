@@ -1,0 +1,284 @@
+﻿@using ReservationManagementApp.Models.Entities
+@model ReservationManagementApp.Models.ViewModels.ReservationScheduleViewModel
+@{
+    ViewData["Title"] = "会議室予約状況";
+    var dateText = Model == null ? string.Empty : Model.Date.ToString("yyyy-MM-dd");
+}
+
+<style>
+    .timeline-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+    .legend-item::before { content: ""; display: inline-block; width: 16px; height: 16px; margin-right: 5px; vertical-align: -3px; border: 1px solid #888; }
+    .legend-available::before { background: #fff; }
+    .legend-selected::before { background: #8cc7ff; }
+    .legend-confirmed::before { background: #ef9a9a; }
+    .legend-tentative::before { background: #ffe082; }
+    .timeline-scroll { overflow-x: auto; border: 1px solid #bbb; margin: 16px 0; }
+    .timeline-header, .timeline-room { display: grid; grid-template-columns: 210px minmax(1008px, 1fr); min-width: 1218px; }
+    .timeline-room + .timeline-room { border-top: 1px solid #bbb; }
+    .room-summary { padding: 10px; background: #f7f7f7; }
+    .room-summary h3 { margin: 0 0 4px; }
+    .room-summary p { margin: 2px 0; }
+    .reservation-list { font-size: .85em; margin-top: 8px; }
+    .timeline-slots { display: grid; grid-template-columns: repeat(36, minmax(28px, 1fr)); }
+    .time-label { box-sizing: border-box; min-width: 0; padding: 5px 1px; border-left: 1px solid #ddd; font-size: .72em; text-align: left; white-space: nowrap; }
+    .time-label.hour-start, .timeline-slot.hour-start { border-left-color: #666; }
+    .timeline-slot { min-width: 0; min-height: 62px; padding: 0; border: 0; border-left: 1px solid #ddd; border-radius: 0; background: #fff; cursor: pointer; }
+    .timeline-slot:hover:not(:disabled) { background: #dcedff; }
+    .timeline-slot:focus { outline: 2px solid #1565c0; outline-offset: -2px; }
+    .timeline-slot.reserved-confirmed { background: #ef9a9a; cursor: not-allowed; }
+    .timeline-slot.reserved-tentative { background: #ffe082; cursor: not-allowed; }
+    .timeline-slot.selected { background: #8cc7ff; box-shadow: inset 0 0 0 1px #1565c0; }
+    .timeline-slot.selection-start { box-shadow: inset 3px 0 0 #0d47a1; }
+    .timeline-slot.selection-end { box-shadow: inset -3px 0 0 #0d47a1; }
+    .selection-panel { padding: 14px; border: 1px solid #999; background: #f7fbff; }
+    .selection-panel dl { display: grid; grid-template-columns: 110px 1fr; margin: 0 0 12px; }
+    .selection-panel dt, .selection-panel dd { margin: 2px 0; }
+    .selection-message { min-height: 1.5em; color: #b00020; }
+    .reservation-source { display: none; }
+</style>
+
+<h2>会議室予約状況</h2>
+@Html.ValidationSummary(false)
+
+@if (Model == null)
+{
+    <p>予約状況を表示できません。</p>
+}
+else
+{
+    <p><strong>@Model.FacilityName</strong> / @Model.Date.ToString("yyyy/MM/dd")</p>
+    <p class="muted">開始スロットをクリックし、続けて終了スロットをクリックしてください。終了スロットの15分間も選択範囲に含まれます。</p>
+
+    <div class="timeline-legend" aria-label="タイムライン凡例">
+        <span class="legend-item legend-available">空き</span>
+        <span class="legend-item legend-selected">選択中</span>
+        <span class="legend-item legend-confirmed">本予約</span>
+        <span class="legend-item legend-tentative">仮予約</span>
+    </div>
+
+    if (Model.Rooms == null || Model.Rooms.Count == 0)
+    {
+        <p>条件に合う会議室はありません。</p>
+    }
+    else
+    {
+        <div class="timeline-scroll">
+            <div class="timeline-header">
+                <div class="room-summary"><strong>会議室</strong></div>
+                <div class="timeline-slots" id="timeline-header-slots" aria-hidden="true"></div>
+            </div>
+
+            @foreach (var room in Model.Rooms)
+            {
+                <div class="timeline-room" data-room-id="@room.RoomId" data-room-name="@room.RoomName" data-hourly-rate="@room.HourlyRate">
+                    <div class="room-summary">
+                        <h3>@room.RoomName</h3>
+                        <p>定員: @room.Capacity 人</p>
+                        <p>1時間: @room.HourlyRate.ToString("N0") 円</p>
+                        @if (room.Reservations != null && room.Reservations.Count > 0)
+                        {
+                            <details class="reservation-list">
+                                <summary>予約一覧</summary>
+                                <ul>
+                                @foreach (var reservation in room.Reservations)
+                                {
+                                    <li>
+                                        @reservation.StartDateTime.ToString("HH:mm")～@reservation.EndDateTime.ToString("HH:mm")
+                                        / @reservation.Status
+                                        / @(string.IsNullOrWhiteSpace(reservation.Title) ? "（タイトル未設定）" : reservation.Title)
+                                    </li>
+                                }
+                                </ul>
+                            </details>
+                        }
+                    </div>
+                    <div class="timeline-slots" data-slot-container>
+                        <div class="reservation-source">
+                        @if (room.Reservations != null)
+                        {
+                            foreach (var reservation in room.Reservations)
+                            {
+                                var startTimeText = reservation.StartDateTime.ToString("HH:mm");
+                                var endTimeText = reservation.EndDateTime.ToString("HH:mm");
+                                <span data-reservation data-start-time="@startTimeText" data-end-time="@endTimeText" data-status="@((int)reservation.Status)" data-title="@reservation.Title"></span>
+                            }
+                        }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <section class="selection-panel" aria-live="polite">
+            <h3>選択内容</h3>
+            <p id="selection-guide">会議室の開始スロットを選択してください。</p>
+            <p id="selection-message" class="selection-message"></p>
+            <dl>
+                <dt>会議室</dt><dd id="selected-room">未選択</dd>
+                <dt>開始時刻</dt><dd id="selected-start">-</dd>
+                <dt>終了時刻</dt><dd id="selected-end">-</dd>
+                <dt>利用時間</dt><dd id="selected-duration">-</dd>
+                <dt>料金プレビュー</dt><dd id="selected-price">-</dd>
+            </dl>
+
+            @using (Html.BeginForm("Input", "Reservation", FormMethod.Get, new { id = "selection-form" }))
+            {
+                @Html.Hidden("roomId", string.Empty, new { id = "selected-room-id" })
+                @Html.Hidden("roomName", string.Empty, new { id = "selected-room-name" })
+                @Html.Hidden("facilityName", Model.FacilityName)
+                @Html.Hidden("date", dateText)
+                @Html.Hidden("startTime", string.Empty, new { id = "selected-start-time" })
+                @Html.Hidden("endTime", string.Empty, new { id = "selected-end-time" })
+                <button type="submit" id="next-button" disabled>次へ</button>
+            }
+        </section>
+    }
+}
+
+<p>@Html.ActionLink("ホームへ戻る", "Index", "ReservationList")</p>
+
+<script>
+    (function () {
+        'use strict';
+        var openingMinutes = 9 * 60;
+        var closingMinutes = 18 * 60;
+        var slotMinutes = 15;
+        var slotCount = (closingMinutes - openingMinutes) / slotMinutes;
+        var header = document.getElementById('timeline-header-slots');
+        var roomRows = document.querySelectorAll('.timeline-room');
+        var selection = null;
+
+        if (!header || roomRows.length === 0) { return; }
+
+        function formatTime(totalMinutes) {
+            var hour = Math.floor(totalMinutes / 60);
+            var minute = totalMinutes % 60;
+            return ('0' + hour).slice(-2) + ':' + ('0' + minute).slice(-2);
+        }
+
+        function parseTime(value) {
+            var parts = value.split(':');
+            return (parseInt(parts[0], 10) * 60) + parseInt(parts[1], 10);
+        }
+
+        function formatDuration(totalMinutes) {
+            var hours = Math.floor(totalMinutes / 60);
+            var minutes = totalMinutes % 60;
+            if (hours === 0) { return minutes + '分'; }
+            return hours + '時間' + (minutes === 0 ? '' : minutes + '分');
+        }
+
+        function buildHeader() {
+            for (var index = 0; index < slotCount; index++) {
+                var label = document.createElement('div');
+                var minutes = openingMinutes + (index * slotMinutes);
+                label.className = 'time-label' + (minutes % 60 === 0 ? ' hour-start' : '');
+                label.textContent = minutes % 60 === 0 ? formatTime(minutes) : '';
+                header.appendChild(label);
+            }
+        }
+
+        function getReservations(row) {
+            var items = row.querySelectorAll('[data-reservation]');
+            var reservations = [];
+            for (var index = 0; index < items.length; index++) {
+                var status = parseInt(items[index].getAttribute('data-status'), 10);
+                if (status === 0 || status === 1) {
+                    reservations.push({ start: parseTime(items[index].getAttribute('data-start-time')), end: parseTime(items[index].getAttribute('data-end-time')), status: status, title: items[index].getAttribute('data-title') || '' });
+                }
+            }
+            return reservations;
+        }
+
+        function findBlockingReservation(reservations, slotStart, slotEnd) {
+            for (var index = 0; index < reservations.length; index++) {
+                if (reservations[index].start < slotEnd && reservations[index].end > slotStart) { return reservations[index]; }
+            }
+            return null;
+        }
+
+        function buildRoomSlots(row) {
+            var container = row.querySelector('[data-slot-container]');
+            var source = container.querySelector('.reservation-source');
+            var reservations = getReservations(row);
+            container.removeChild(source);
+            for (var index = 0; index < slotCount; index++) {
+                var slotStart = openingMinutes + (index * slotMinutes);
+                var slotEnd = slotStart + slotMinutes;
+                var blocking = findBlockingReservation(reservations, slotStart, slotEnd);
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'timeline-slot' + (slotStart % 60 === 0 ? ' hour-start' : '');
+                button.setAttribute('data-slot-index', index);
+                button.setAttribute('aria-label', row.getAttribute('data-room-name') + ' ' + formatTime(slotStart) + '～' + formatTime(slotEnd));
+                if (blocking) {
+                    button.disabled = true;
+                    button.className += blocking.status === 1 ? ' reserved-confirmed' : ' reserved-tentative';
+                    button.title = (blocking.status === 1 ? '本予約' : '仮予約') + ' ' + formatTime(blocking.start) + '～' + formatTime(blocking.end) + (blocking.title ? ' ' + blocking.title : '');
+                } else {
+                    button.title = formatTime(slotStart) + '～' + formatTime(slotEnd) + 'を選択';
+                    button.addEventListener('click', function () { selectSlot(row, parseInt(this.getAttribute('data-slot-index'), 10)); });
+                }
+                container.appendChild(button);
+            }
+        }
+
+        function rangeContainsBlockedSlot(row, startIndex, endIndex) {
+            var buttons = row.querySelectorAll('.timeline-slot');
+            for (var index = startIndex; index <= endIndex; index++) {
+                if (buttons[index].disabled) { return true; }
+            }
+            return false;
+        }
+
+        function selectSlot(row, slotIndex) {
+            var message = document.getElementById('selection-message');
+            message.textContent = '';
+            if (!selection || selection.complete || selection.row !== row) {
+                selection = { row: row, startIndex: slotIndex, endIndex: slotIndex, complete: false };
+                renderSelection();
+                return;
+            }
+            var startIndex = Math.min(selection.startIndex, slotIndex);
+            var endIndex = Math.max(selection.startIndex, slotIndex);
+            if (rangeContainsBlockedSlot(row, startIndex, endIndex)) {
+                message.textContent = '既存予約をまたぐ時間帯は選択できません。終了スロットを選び直してください。';
+                return;
+            }
+            selection.startIndex = startIndex;
+            selection.endIndex = endIndex;
+            selection.complete = true;
+            renderSelection();
+        }
+
+        function renderSelection() {
+            var allSlots = document.querySelectorAll('.timeline-slot');
+            for (var index = 0; index < allSlots.length; index++) { allSlots[index].classList.remove('selected', 'selection-start', 'selection-end'); }
+            var rowSlots = selection.row.querySelectorAll('.timeline-slot');
+            for (var selectedIndex = selection.startIndex; selectedIndex <= selection.endIndex; selectedIndex++) { rowSlots[selectedIndex].classList.add('selected'); }
+            rowSlots[selection.startIndex].classList.add('selection-start');
+            rowSlots[selection.endIndex].classList.add('selection-end');
+
+            var startMinutes = openingMinutes + (selection.startIndex * slotMinutes);
+            var endMinutes = openingMinutes + ((selection.endIndex + 1) * slotMinutes);
+            var durationMinutes = endMinutes - startMinutes;
+            var hourlyRate = parseInt(selection.row.getAttribute('data-hourly-rate'), 10);
+            var price = (hourlyRate / 4) * (durationMinutes / slotMinutes);
+
+            document.getElementById('selected-room').textContent = selection.row.getAttribute('data-room-name');
+            document.getElementById('selected-start').textContent = formatTime(startMinutes);
+            document.getElementById('selected-end').textContent = formatTime(endMinutes);
+            document.getElementById('selected-duration').textContent = formatDuration(durationMinutes);
+            document.getElementById('selected-price').textContent = price.toLocaleString('ja-JP') + '円';
+            document.getElementById('selection-guide').textContent = selection.complete ? '選択内容を確認して「次へ」を押してください。別の範囲を選ぶ場合は開始スロットをクリックしてください。' : '同じ会議室内で終了スロットをクリックしてください。';
+            document.getElementById('selected-room-id').value = selection.row.getAttribute('data-room-id');
+            document.getElementById('selected-room-name').value = selection.row.getAttribute('data-room-name');
+            document.getElementById('selected-start-time').value = formatTime(startMinutes);
+            document.getElementById('selected-end-time').value = formatTime(endMinutes);
+            document.getElementById('next-button').disabled = !selection.complete;
+        }
+
+        buildHeader();
+        for (var rowIndex = 0; rowIndex < roomRows.length; rowIndex++) { buildRoomSlots(roomRows[rowIndex]); }
+    }());
+</script>

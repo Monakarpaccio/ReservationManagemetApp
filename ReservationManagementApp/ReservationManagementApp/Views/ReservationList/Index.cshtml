@@ -1,0 +1,135 @@
+﻿@using ReservationManagementApp.Models.Entities
+@model IEnumerable<ReservationManagementApp.Models.ViewModels.ReservationDetailViewModel>
+@{
+    ViewData["Title"] = "予約一覧";
+    var selectedListType = ViewData["SelectedListType"] as string ?? "confirmed";
+    var isCompletedList = selectedListType == "completed";
+    var selectedListName = selectedListType == "temporary"
+        ? "仮予約"
+        : (isCompletedList ? "実施済み" : "本予約");
+    var facilities = ViewData["Facilities"] as IEnumerable<Facility> ?? Enumerable.Empty<Facility>();
+    var reservations = Model == null
+        ? new List<ReservationManagementApp.Models.ViewModels.ReservationDetailViewModel>()
+        : Model.ToList();
+}
+
+<h2>予約一覧</h2>
+@Html.ValidationSummary(false)
+
+<div class="actions">
+    @Html.ActionLink("本予約", "Index", new { listType = "confirmed" })
+    @Html.ActionLink("仮予約", "Index", new { listType = "temporary" })
+    @Html.ActionLink("実施済み", "Index", new { listType = "completed" })
+</div>
+
+<p>表示中: @selectedListName</p>
+
+@if (!reservations.Any())
+{
+    <p>対象の予約はありません。</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>日時</th><th>拠点・会議室</th><th>タイトル</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var reservation in reservations)
+        {
+            <tr>
+                <td>@reservation.StartDateTime.ToString("yyyy/MM/dd HH:mm") ～ @reservation.EndDateTime.ToString("HH:mm")</td>
+                <td>@reservation.FacilityName / @reservation.RoomName</td>
+                <td>@(string.IsNullOrWhiteSpace(reservation.Title) ? "（未設定）" : reservation.Title)</td>
+                <td>
+                    <div class="actions">
+                        @if (!isCompletedList && reservation.Status == ReservationStatus.Confirmed)
+                        {
+                            @Html.ActionLink("変更", "Edit", new { reservationId = reservation.ReservationId })
+                        }
+                        else if (reservation.Status == ReservationStatus.Tentative)
+                        {
+                            @Html.ActionLink("予約確定", "TemporaryInput", new { reservationId = reservation.ReservationId })
+                        }
+                        @if (!isCompletedList)
+                        {
+                            using (Html.BeginForm("Cancel", "ReservationList", FormMethod.Post, new { @class = "inline-form" }))
+                            {
+                                @Html.AntiForgeryToken()
+                                @Html.Hidden("reservationId", reservation.ReservationId)
+                                @Html.Hidden("listType", selectedListType)
+                                <button type="submit">キャンセル</button>
+                            }
+                        }
+                    </div>
+                    <details>
+                        <summary>詳細</summary>
+                        <dl>
+                            <dt>備考</dt><dd>@(string.IsNullOrWhiteSpace(reservation.Remarks) ? "なし" : reservation.Remarks)</dd>
+                            <dt>料金</dt><dd>@(reservation.TotalPrice.HasValue ? reservation.TotalPrice.Value.ToString("N0") + "円" : "未確定")</dd>
+                            <dt>参加者</dt>
+                            <dd>
+                                @if (reservation.Participants == null || reservation.Participants.Count == 0)
+                                {
+                                    <span>なし</span>
+                                }
+                                else
+                                {
+                                    <ul>
+                                    @foreach (var participant in reservation.Participants)
+                                    {
+                                        <li>@participant.Name / @participant.CompanyName @(participant.IsPrivate ? "（非公開）" : "")</li>
+                                    }
+                                    </ul>
+                                }
+                            </dd>
+                        </dl>
+                    </details>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<fieldset>
+    <legend>新規本予約</legend>
+    @using (Html.BeginForm("Search", "Reservation", FormMethod.Get))
+    {
+        <label>
+            拠点
+            <select name="facilityId" required>
+                <option value="">選択してください</option>
+                @foreach (var facility in facilities)
+                {
+                    <option value="@facility.FacilityId">@facility.FacilityName</option>
+                }
+            </select>
+        </label>
+        <label>日付 <input type="date" name="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" required /></label>
+        <label>人数 <input type="number" name="capacity" min="1" /></label>
+        <button type="submit">会議室を検索</button>
+    }
+</fieldset>
+
+<fieldset>
+    <legend>新規仮予約</legend>
+    @using (Html.BeginForm("TemporarySearch", "Reservation", FormMethod.Get))
+    {
+        <label>
+            拠点
+            <select name="facilityId" required>
+                <option value="">選択してください</option>
+                @foreach (var facility in facilities)
+                {
+                    <option value="@facility.FacilityId">@facility.FacilityName</option>
+                }
+            </select>
+        </label>
+        <label>日付 <input type="date" name="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" required /></label>
+        <label>開始 <input type="time" name="startTime" min="09:00" max="17:45" step="900" required /></label>
+        <label>終了 <input type="time" name="endTime" min="09:15" max="18:00" step="900" required /></label>
+        <label>人数 <input type="number" name="capacity" min="1" /></label>
+        <button type="submit">空き会議室を検索</button>
+    }
+</fieldset>

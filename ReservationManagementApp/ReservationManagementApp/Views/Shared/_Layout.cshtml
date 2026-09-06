@@ -1,0 +1,54 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - 会議室予約システム</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.5; margin: 0; color: #222; }
+        header, main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+        header { border-bottom: 1px solid #ccc; }
+        nav a { margin-right: 12px; }
+        fieldset { margin: 16px 0; padding: 16px; }
+        label { display: inline-block; margin: 4px 8px 4px 0; }
+        input, select, textarea, button { padding: 6px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .inline-form { display: inline; }
+        .validation-summary-errors { color: #b00020; }
+        .participant-row { border-top: 1px solid #ddd; padding: 8px 0; }
+        .muted { color: #666; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>会議室予約システム</h1>
+        <nav>
+            @Html.ActionLink("ホーム", "Index", "ReservationList")
+        </nav>
+    </header>
+    <main>
+        @RenderBody()
+    </main>
+    <script>
+        (function () {
+            var forms = document.querySelectorAll('form.participant-form');
+            for (var i = 0; i < forms.length; i++) {
+                forms[i].addEventListener('submit', function () {
+                    var rows = this.querySelectorAll('.participant-row');
+                    for (var j = 0; j < rows.length; j++) {
+                        var name = rows[j].querySelector('.participant-name');
+                        if (name && name.value.trim() === '') {
+                            var fields = rows[j].querySelectorAll('input, select, textarea');
+                            for (var k = 0; k < fields.length; k++) {
+                                fields[k].disabled = true;
+                            }
+                        }
+                    }
+                });
+            }
+        }());
+    </script>
+</body>
+</html>

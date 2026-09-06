@@ -1,0 +1,48 @@
+﻿@using ReservationManagementApp.Models.Entities
+@model IEnumerable<Room>
+@{
+    ViewData["Title"] = "仮予約用会議室検索";
+    var rooms = Model == null ? new List<Room>() : Model.ToList();
+    var searchDate = ViewData["Date"] is DateTime ? (DateTime)ViewData["Date"] : DateTime.MinValue;
+    var startTime = ViewData["StartTime"] is TimeSpan ? (TimeSpan)ViewData["StartTime"] : TimeSpan.Zero;
+    var endTime = ViewData["EndTime"] is TimeSpan ? (TimeSpan)ViewData["EndTime"] : TimeSpan.Zero;
+    var dateText = searchDate.ToString("yyyy-MM-dd");
+    var startTimeText = startTime.ToString("hh\\:mm");
+    var endTimeText = endTime.ToString("hh\\:mm");
+}
+
+<h2>仮予約用会議室検索</h2>
+@Html.ValidationSummary(false)
+
+@if (!rooms.Any())
+{
+    <p>予約可能な会議室はありません。</p>
+}
+else
+{
+    using (Html.BeginForm("CreateTemporary", "Reservation", FormMethod.Post))
+    {
+        @Html.AntiForgeryToken()
+        @Html.Hidden("date", dateText)
+        @Html.Hidden("startTime", startTimeText)
+        @Html.Hidden("endTime", endTimeText)
+        <p>@searchDate.ToString("yyyy/MM/dd") @startTimeText ～ @endTimeText</p>
+        <table>
+            <thead><tr><th>選択</th><th>会議室</th><th>定員</th><th>1時間料金</th></tr></thead>
+            <tbody>
+            @foreach (var room in rooms)
+            {
+                <tr>
+                    <td><input type="radio" name="roomId" value="@room.RoomId" required /></td>
+                    <td>@room.RoomName</td>
+                    <td>@room.Capacity 人</td>
+                    <td>@room.HourlyRate.ToString("N0") 円</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <button type="submit">仮予約する</button>
+    }
+}
+
+<p>@Html.ActionLink("ホームへ戻る", "Index", "ReservationList")</p>

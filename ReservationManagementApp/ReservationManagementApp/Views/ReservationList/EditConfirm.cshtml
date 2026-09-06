@@ -1,0 +1,56 @@
+﻿@using ReservationManagementApp.Models.Entities
+@model ReservationManagementApp.Models.ViewModels.ReservationInputViewModel
+@{
+    ViewData["Title"] = "予約変更確認";
+    var participants = Model.Participants ?? new List<Participant>();
+    var dateText = Model.Date.ToString("yyyy-MM-dd");
+    var startTimeText = Model.StartTime.ToString("hh\\:mm");
+    var endTimeText = Model.EndTime.ToString("hh\\:mm");
+}
+
+<h2>予約変更確認</h2>
+@Html.ValidationSummary(false)
+<dl>
+    <dt>拠点・会議室</dt><dd>@Model.FacilityName / @Model.RoomName</dd>
+    <dt>日時</dt><dd>@Model.Date.ToString("yyyy/MM/dd") @startTimeText ～ @endTimeText</dd>
+    <dt>タイトル</dt><dd>@Model.Title</dd>
+    <dt>備考</dt><dd>@(string.IsNullOrWhiteSpace(Model.Remarks) ? "なし" : Model.Remarks)</dd>
+    <dt>参加者</dt>
+    <dd>
+        <span>@(participants.Count == 0 ? "なし" : "")</span>
+        <ul>
+        @foreach (var participant in participants)
+        {
+            <li>@participant.Name / @participant.CompanyName <span>@(participant.IsPrivate ? "（非公開）" : "")</span></li>
+        }
+        </ul>
+    </dd>
+</dl>
+
+@using (Html.BeginForm("Update", "ReservationList", FormMethod.Post))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.ReservationId)
+    @Html.HiddenFor(m => m.RoomId)
+    @Html.HiddenFor(m => m.RoomName)
+    @Html.HiddenFor(m => m.FacilityName)
+    @Html.Hidden("Date", dateText)
+    @Html.Hidden("StartTime", startTimeText)
+    @Html.Hidden("EndTime", endTimeText)
+    @Html.HiddenFor(m => m.Title)
+    @Html.HiddenFor(m => m.Remarks)
+    for (var i = 0; i < participants.Count; i++)
+    {
+        var nameField = "Participants[" + i + "].Name";
+        var companyField = "Participants[" + i + "].CompanyName";
+        var privateField = "Participants[" + i + "].IsPrivate";
+        @Html.Hidden("Participants.Index", i)
+        @Html.Hidden(nameField, participants[i].Name)
+        @Html.Hidden(companyField, participants[i].CompanyName)
+        @Html.Hidden(privateField, participants[i].IsPrivate)
+    }
+    <div class="actions">
+        <button type="button" onclick="history.back()">戻る</button>
+        <button type="submit">変更確定</button>
+    </div>
+}
